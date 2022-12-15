@@ -144,6 +144,51 @@ void ValidateSelectedItem (edict_t *ent)
 
 /*
 ==================
+Cmd_Start_Round
+
+Give items to a client
+==================
+*/
+int roundNum = 4;
+
+void Cmd_Start_Round(edict_t* ent)
+{
+	gi.cprintf(ent, PRINT_HIGH, "Round Starting.");
+	roundNum++;
+	gi.centerprintf(ent, "Round %d", roundNum);
+
+	edict_t* boss = NULL;		// TO DO: MAke an array for multiple bosses
+	edict_t* monster[10] = { NULL };
+	for (int i = 0; i < roundNum; i++) {
+		if (monster[i] == NULL || monster[i]->deadflag > DEAD_NO) {
+			monster[i] = G_Spawn();
+			SP_monster_gunner(monster[i]);
+			vec3_t oldorg, neworg, move;
+			move[0] = 40 * i;
+			move[1] = 40 * i;
+			move[2] = 25;
+			VectorCopy(monster[i]->s.origin, oldorg);
+			VectorAdd(monster[i]->s.origin, move, neworg);
+			VectorCopy(neworg, monster[i]->s.origin);
+		}
+	}
+
+	if (roundNum % 5 == 0) {
+		boss = G_Spawn();
+		SP_monster_tank(boss);
+		vec3_t oldorg, neworg, move;
+		move[0] = -50;
+		move[1] = -50;
+		move[2] = 25;
+		VectorCopy(boss->s.origin, oldorg);
+		VectorAdd(boss->s.origin, move, neworg);
+		VectorCopy(neworg, boss->s.origin);
+	}
+}
+
+
+/*
+==================
 Cmd_Give_f
 
 Give items to a client
