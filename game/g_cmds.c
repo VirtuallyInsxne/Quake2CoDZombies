@@ -186,7 +186,6 @@ void Cmd_Start_Round(edict_t* ent)
 	}
 }
 
-
 /*
 ==================
 Cmd_Give_f
