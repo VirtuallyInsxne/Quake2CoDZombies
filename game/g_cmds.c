@@ -20,7 +20,22 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "g_local.h"
 #include "m_player.h"
 
+const int perk1Cost = 1500;
+const int perk2Cost = 500;
+const int perk3Cost = 1500;
+const int perk4Cost = 1000;
+const int perk5Cost = 2500;
+const int perk6Cost = 300;
 int roundNum = 0;
+int points = 0;
+qboolean shopOpened = false;
+qboolean pointsAdded = false;
+qboolean bought1 = false;
+qboolean bought3 = false;
+qboolean bought4 = false;
+qboolean bought5 = false;
+edict_t* boss = NULL;
+edict_t* monster[50] = { NULL };
 
 char *ClientTeam (edict_t *ent)
 {
@@ -151,14 +166,16 @@ Starts the wave spawning monsters
 ==================
 */
 
+//player_die
 void Cmd_Start_Round(edict_t* ent)
 {
 	gi.cprintf(ent, PRINT_HIGH, "Round Starting.");
+	ent->client->showhelp = false;
+	shopOpened = false;
+	pointsAdded = false;
 	roundNum++;
 	gi.centerprintf(ent, "Round %d", roundNum);
 
-	edict_t* boss = NULL;		// TO DO: MAke an array for multiple bosses
-	edict_t* monster[10] = { NULL };
 	for (int i = 0; i < roundNum; i++) {
 		if (monster[i] == NULL || monster[i]->deadflag > DEAD_NO) {
 			monster[i] = G_Spawn();
@@ -196,10 +213,230 @@ Prints out help menu to the console
 
 void Cmd_Mod_Help(edict_t* ent) {
 	gi.cprintf(ent, PRINT_HIGH, "Mod Help\n");
-	gi.cprintf(ent, PRINT_HIGH, "In order to start round, use command cmd startround.\n");
-	gi.cprintf(ent, PRINT_HIGH, "After all enemies are dead, it will not automatically go to the next round.\n");
-	gi.cprintf(ent, PRINT_HIGH, "Take this time to use cmd openshop to buy perks or use the same command cmd startround to go to the next round.\n");
+	gi.cprintf(ent, PRINT_HIGH, "In order to start round, use command cmd startround\n");
+	gi.cprintf(ent, PRINT_HIGH, "After all enemies are dead, it will not automatically go to the next round\n");
+	gi.cprintf(ent, PRINT_HIGH, "Take this time to use cmd openshop to buy perks or use the same command cmd startround to go to the next round\n");
 	gi.cprintf(ent, PRINT_HIGH, "Survive as long as you can!");
+}
+
+/*
+==================
+Cmd_Mod_Help
+
+Prints out help menu to the console
+==================
+*/
+
+void Cmd_Open_Shop(edict_t* ent) {
+	ent->client->showhelp = true;
+	shopOpened = true;
+	char	string[1024];
+
+	if (pointsAdded == false) {
+		for (int i = 0; i < 10; i++) {
+			if (monster[i] != NULL && monster[i]->deadflag > DEAD_NO) {
+				points += 200;
+			}
+		}
+		pointsAdded = true;
+	}
+	char* sk = "Shop";
+
+	// send the layout
+	Com_sprintf(string, sizeof(string),
+		"xv 32 yv 8 picn help "			// background
+		"xv 202 yv 12 string2 \"%s\" "		// skill
+		"xv 0 yv 24 cstring2 \"%s\" "		// level name
+		"xv 0 yv 54 cstring2 \"%s\" "		// help 1
+		"xv 0 yv 110 cstring2 \"%s\" "		// help 2
+		"xv 50 yv 164 string2 \"kills     rounds    points\" "
+		"xv 50 yv 172 string2 \"%3i		     %3i       %3i\" ",
+		sk,
+		level.level_name,
+		"1) Increased Health [1500]\n2) Max Armor [1000]\n3) Increased Speed [1500]\n",
+		"4) Gamble Weapon [1000]\n5) Increased Max Ammo [2500]\n6) Ammo Refill [300]\n",
+		level.killed_monsters,
+		roundNum,
+		points);
+
+	gi.WriteByte(svc_layout);
+	gi.WriteString(string);
+	gi.unicast(ent, true);
+}
+
+/*
+==================
+Cmd_Extra_Health
+
+Give Perk 1 to player
+==================
+*/
+Cmd_Extra_Health(edict_t* ent) {
+	if (shopOpened == false) { return; }
+	if (points < perk1Cost) { 
+		gi.cprintf(ent, PRINT_HIGH, "Not Enough Points.");
+		return;
+	}
+	if (bought1) { 
+		gi.cprintf(ent, PRINT_HIGH, "Perk has been bought already.");
+		return; 
+	}
+
+	ent->max_health += 50;
+	ent->health = ent->max_health;
+	points = points - perk1Cost;
+	gi.cprintf(ent, PRINT_HIGH, "Perk has been bought.");
+	bought1 = true;
+	Cmd_Open_Shop(ent);
+}
+
+/*
+==================
+Cmd_Extra_Armor
+
+Give Perk 2 to player
+==================
+*/
+Cmd_Extra_Armor(edict_t* ent) {
+	gitem_t* it;
+	gitem_armor_t* info;
+
+	if (shopOpened == false) { return; }
+	if (points < perk2Cost) {
+		gi.cprintf(ent, PRINT_HIGH, "Not Enough Points.");
+		return;
+	}
+
+	it = FindItem("Body Armor");
+	info = (gitem_armor_t*)it->info;
+	ent->client->pers.inventory[ITEM_INDEX(it)] = info->max_count;
+	points = points - perk2Cost;
+	gi.cprintf(ent, PRINT_HIGH, "Perk has been bought.");
+	Cmd_Open_Shop(ent);
+}
+
+/*
+==================
+Cmd_Extra_Speed
+
+Give Perk 3 to player
+==================
+*/
+Cmd_Extra_Speed(edict_t* ent) {
+	if (shopOpened == false) { return; }
+	if (points < perk3Cost) {
+		gi.cprintf(ent, PRINT_HIGH, "Not Enough Points.");
+		return;
+	}
+	if (bought3) {
+		gi.cprintf(ent, PRINT_HIGH, "Perk has been bought already.");
+		return;
+	}
+
+	ent->speed *= 10;
+	ent->accel *= 10;
+	points = points - perk3Cost;
+	gi.cprintf(ent, PRINT_HIGH, "Perk has been bought.");
+	bought3 = true;
+	Cmd_Open_Shop(ent);
+}
+
+/*
+==================
+Cmd_Extra_Life
+
+Give Perk 4 to player
+==================
+*/
+Cmd_Gamble_Weapon(edict_t* ent) {
+	gitem_t* it;
+	if (shopOpened == false) { return; }
+	if (points < perk4Cost) {
+		gi.cprintf(ent, PRINT_HIGH, "Not Enough Points.");
+		return;
+	}
+	int weaponNum = rand() % (18 - 8) + 8;
+	while (ent->client->pers.inventory[weaponNum] > 0) {
+		weaponNum = rand() % (18 - 8) + 8;
+	}
+		
+	it = itemlist + weaponNum;
+	ent->client->pers.inventory[weaponNum] += 1;
+	points = points - perk4Cost;
+	gi.cprintf(ent, PRINT_HIGH, "Acquired Weapon Slot %d",weaponNum - 6 );
+	Cmd_Open_Shop(ent);
+}
+
+/*
+==================
+Cmd_Extra_Ammo
+
+Give Perk 5 to player
+==================
+*/
+Cmd_Extra_Ammo(edict_t* ent) {
+	gitem_t* it;
+	edict_t* it_ent;
+
+	if (shopOpened == false) { return; }
+	if (points < perk5Cost) {
+		gi.cprintf(ent, PRINT_HIGH, "Not Enough Points.");
+		return;
+	}
+	if (bought5) {
+		gi.cprintf(ent, PRINT_HIGH, "Perk has been bought already.");
+		return;
+	}
+
+	it = FindItem("Bandolier");
+	it_ent = G_Spawn();
+	it_ent->classname = it->classname;
+	SpawnItem(it_ent, it);
+	Touch_Item(it_ent, ent, NULL, NULL);
+	if (it_ent->inuse)
+		G_FreeEdict(it_ent);
+
+	points = points - perk5Cost;
+	gi.cprintf(ent, PRINT_HIGH, "Perk has been bought.");
+	bought5 = true;
+	Cmd_Open_Shop(ent);
+}
+
+/*
+==================
+Cmd_Increase_Ammo
+
+Give Perk 6 to player
+==================
+*/
+Cmd_Ammo_Refill(edict_t* ent) {
+	gitem_t* it;
+
+	if (shopOpened == false) { return; }
+	if (points < perk6Cost) {
+		gi.cprintf(ent, PRINT_HIGH, "Not Enough Points.");
+		return;
+	}
+
+	for (int i = 0; i < game.num_items; i++)
+	{
+		it = itemlist + i;
+		if (!it->pickup)
+			continue;
+		if (!(it->flags & IT_AMMO))
+			continue;
+		Add_Ammo(ent, it, 50);
+	}
+
+
+	points = points - perk6Cost;
+	gi.cprintf(ent, PRINT_HIGH, "Perk has been bought.");
+	Cmd_Open_Shop(ent);
+}
+
+void Cmd_Give_Points(edict_t* ent, int num) {
+	points += num;
+	gi.cprintf(ent, PRINT_HIGH, "Points: %d", points);
 }
 
 /*
@@ -1051,6 +1288,22 @@ void ClientCommand (edict_t *ent)
 		Cmd_Start_Round(ent);
 	else if (Q_stricmp(cmd, "modhelp") == 0)
 		Cmd_Mod_Help(ent);
+	else if (Q_stricmp(cmd, "openshop") == 0)
+		Cmd_Open_Shop(ent);
+	else if (Q_stricmp(cmd, "1") == 0)
+		Cmd_Extra_Health(ent);
+	else if (Q_stricmp(cmd, "2") == 0)
+		Cmd_Extra_Armor(ent);
+	else if (Q_stricmp(cmd, "3") == 0)
+		Cmd_Extra_Speed(ent);
+	else if (Q_stricmp(cmd, "4") == 0)
+		Cmd_Gamble_Weapon(ent);
+	else if (Q_stricmp(cmd, "5") == 0)
+		Cmd_Extra_Ammo(ent);
+	else if (Q_stricmp(cmd, "6") == 0)
+		Cmd_Ammo_Refill(ent);
+	else if (Q_stricmp(cmd, "givepoints") == 0)
+		Cmd_Give_Points(ent,gi.argv(1));
 	else	// anything that doesn't match a command will be a chat
 		Cmd_Say_f (ent, false, true);
 }
