@@ -21,7 +21,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "m_player.h"
 
 const int perk1Cost = 1500;
-const int perk2Cost = 500;
+const int perk2Cost = 1000;
 const int perk3Cost = 1500;
 const int perk4Cost = 1000;
 const int perk5Cost = 2500;
@@ -216,6 +216,7 @@ void Cmd_Mod_Help(edict_t* ent) {
 	gi.cprintf(ent, PRINT_HIGH, "In order to start round, use command cmd startround\n");
 	gi.cprintf(ent, PRINT_HIGH, "After all enemies are dead, it will not automatically go to the next round\n");
 	gi.cprintf(ent, PRINT_HIGH, "Take this time to use cmd openshop to buy perks or use the same command cmd startround to go to the next round\n");
+	gi.cprintf(ent, PRINT_HIGH, "If you open the shop, make sure to go into the console and type in the number of the perk you wish to buy\n");
 	gi.cprintf(ent, PRINT_HIGH, "Survive as long as you can!");
 }
 
@@ -230,7 +231,7 @@ Prints out help menu to the console
 void Cmd_Open_Shop(edict_t* ent) {
 	ent->client->showhelp = true;
 	shopOpened = true;
-	char	string[1024];
+	char string[1024];
 
 	if (pointsAdded == false) {
 		for (int i = 0; i < 10; i++) {
